@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Data Collection System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .progress-bar {
+            transition: width 0.5s ease-in-out;
+        }
+        
+        .risk-high {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+        
+        .risk-low {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+        
+        .question-card {
+            transition: all 0.3s ease;
+        }
+        
+        .question-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <i class="fas fa-hospital text-blue-600 text-2xl mr-3"></i>
+                    <h1 class="text-xl font-bold text-gray-900">Patient Data Collection System</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-500">Pharmacovigilance Portal</span>
+                    <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                        <i class="fas fa-user text-white text-sm"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto px-4 py-8">
+        <!-- Login Section -->
+        <div id="loginSection" class="fade-in">
+            <div class="bg-white rounded-xl shadow-lg p-8 max-w-md mx-auto">
+                <div class="text-center mb-8">
+                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-user-injured text-blue-600 text-2xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">Patient Login</h2>
+                    <p class="text-gray-600">Enter your PHN number to continue</p>
+                </div>
+                
+                <form id="loginForm" class="space-y-6">
+                    <div>
+                        <label for="phn" class="block text-sm font-medium text-gray-700 mb-2">
+                            PHN (Personal Health Number)
+                        </label>
+                        <div class="relative">
+                            <input 
+                                type="text" 
+                                id="phn" 
+                                name="phn"
+                                placeholder="Enter your 10-digit PHN"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-12"
+                                required
+                                pattern="[0-9]{10}"
+                                maxlength="10"
+                            >
+                            <i class="fas fa-id-card absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        </div>
+                        <p class="mt-2 text-sm text-gray-500">Enter your 10-digit Personal Health Number</p>
+                    </div>
+                    
+                    <button 
+                        type="submit" 
+                        class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition duration-200 flex items-center justify-center"
+                    >
+                        <i class="fas fa-sign-in-alt mr-2"></i>
+                        Continue
+                    </button>
+                </form>
+                
+                <div id="loginError" class="hidden mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+                        <span class="text-red-700" id="loginErrorMessage"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Questions Section -->
+        <div id="questionsSection" class="hidden fade-in">
+            <!-- Patient Info Card -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+                            <i class="fas fa-user text-blue-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900" id="patientName">Patient Name</h3>
+                            <p class="text-gray-600">PHN: <span id="patientPHN"></span></p>
+                        </div>
+                    </div>
+                    <button 
+                        onclick="logout()" 
+                        class="text-gray-500 hover:text-gray-700 transition"
+                    >
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="mt-6">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-medium text-gray-700">Progress</span>
+                        <span class="text-sm text-gray-500" id="progressText">0/0 questions</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="progressBar" class="progress-bar bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Questions Container -->
+            <div id="questionsContainer" class="space-y-4">
+                <!-- Questions will be dynamically added here -->
+            </div>
+
+            <!-- Navigation Buttons -->
+            <div class="flex justify-between mt-8">
+                <button 
+                    id="prevBtn"
+                    onclick="previousQuestion()" 
+                    class="px-6 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled
+                >
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Previous
+                </button>
+                
+                <button 
+                    id="nextBtn"
+                    onclick="nextQuestion()" 
+                    class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled
+                >
+                    Next
+                    <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Completion Section -->
+        <div id="completionSection" class="hidden fade-in">
+            <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+                <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fas fa-check-circle text-green-600 text-3xl"></i>
+                </div>
+                
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Assessment Complete!</h2>
+                
+                <!-- Risk Assessment Result -->
+                <div id="riskAssessment" class="mb-6">
+                    <!-- Risk assessment will be dynamically added here -->
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-900 mb-2">Summary</h3>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-600">Total Questions:</span>
+                                <span class="font-medium" id="totalQuestions">0</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Answered:</span>
+                                <span class="font-medium" id="answeredQuestions">0</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button 
+                        onclick="viewSummary()" 
+                        class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition duration-200"
+                    >
+                        <i class="fas fa-file-medical mr-2"></i>
+                        View Full Summary
+                    </button>
+                    
+                    <button 
+                        onclick="logout()" 
+                        class="w-full border border-gray-300 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-50 transition duration-200"
+                    >
+                        <i class="fas fa-sign-out-alt mr-2"></i>
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 flex items-center">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+            <span class="text-gray-700">Processing...</span>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentPatient = null;
+        let questions = [];
+        let currentQuestionIndex = 0;
+        let answers = {};
+
+        // API Base URL
+        const API_BASE = 'http://localhost:8000/api/patient-interface';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+        });
+
+        // Handle login
+        async function handleLogin(e) {
+            e.preventDefault();
+            
+            const phn = document.getElementById('phn').value.trim();
+            if (!phn || phn.length !== 10) {
+                showLoginError('Please enter a valid 10-digit PHN number');
+                return;
+            }
+
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ phn: phn })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentPatient = data.patient;
+                    await loadQuestions(phn);
+                    showQuestionsSection();
+                } else {
+                    showLoginError(data.detail || 'Login failed');
+                }
+            } catch (error) {
+                showLoginError('Network error. Please try again.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Load questions
+        async function loadQuestions(phn) {
+            try {
+                const response = await fetch(`${API_BASE}/questions/${phn}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    questions = data.questions;
+                    currentQuestionIndex = 0;
+                    answers = {};
+                    renderQuestion();
+                    updateProgress();
+                } else {
+                    showLoginError(data.detail || 'Failed to load questions');
+                }
+            } catch (error) {
+                showLoginError('Failed to load questions');
+            }
+        }
+
+        // Render current question
+        function renderQuestion() {
+            if (currentQuestionIndex >= questions.length) {
+                showCompletionSection();
+                return;
+            }
+
+            const question = questions[currentQuestionIndex];
+            const container = document.getElementById('questionsContainer');
+            
+            container.innerHTML = `
+                <div class="question-card bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-start mb-4">
+                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
+                            <span class="text-blue-600 font-semibold text-sm">${currentQuestionIndex + 1}</span>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">${question.question}</h3>
+                            <p class="text-sm text-gray-500 mb-4">Field: ${question.field_name}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <textarea 
+                            id="answerInput" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                            rows="3"
+                            placeholder="Type your answer here..."
+                            oninput="saveAnswer()"
+                        >${answers[question.response_id] || ''}</textarea>
+                        
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-500">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Please provide accurate information
+                            </span>
+                            <button 
+                                onclick="submitAnswer()" 
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition duration-200"
+                            >
+                                <i class="fas fa-paper-plane mr-2"></i>
+                                Submit Answer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Update navigation buttons
+            document.getElementById('prevBtn').disabled = currentQuestionIndex === 0;
+            document.getElementById('nextBtn').disabled = !answers[question.response_id];
+        }
+
+        // Save answer
+        function saveAnswer() {
+            const question = questions[currentQuestionIndex];
+            const answer = document.getElementById('answerInput').value.trim();
+            
+            console.log('Saving answer:', answer); // Debug log
+            
+            if (answer) {
+                answers[question.response_id] = answer;
+                document.getElementById('nextBtn').disabled = false;
+                console.log('Answer saved, next button enabled'); // Debug log
+            } else {
+                delete answers[question.response_id];
+                document.getElementById('nextBtn').disabled = true;
+                console.log('Answer cleared, next button disabled'); // Debug log
+            }
+        }
+
+        // Submit answer
+        async function submitAnswer() {
+            const question = questions[currentQuestionIndex];
+            const answer = answers[question.response_id];
+            
+            console.log('Submitting answer for question:', question); // Debug log
+            console.log('Answer to submit:', answer); // Debug log
+            
+            if (!answer) {
+                alert('Please provide an answer before submitting');
+                return;
+            }
+
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`${API_BASE}/submit-answer`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        response_id: question.response_id,
+                        answer: answer
+                    })
+                });
+
+                const data = await response.json();
+                console.log('Server response:', data); // Debug log
+                
+                if (data.success) {
+                    // Update patient progress
+                    currentPatient.answered_correctly = data.result.answered_correctly;
+                    currentPatient.pending = data.result.pending;
+                    currentPatient.completion_percentage = data.result.completion_percentage;
+                    
+                    updateProgress();
+                    
+                    // Check if completed
+                    if (data.result.pending === 0) {
+                        showCompletionSection(data.result.risk_assessment);
+                    } else {
+                        // Move to next question
+                        currentQuestionIndex++;
+                        renderQuestion();
+                    }
+                } else {
+                    alert('Failed to submit answer. Please try again.');
+                }
+            } catch (error) {
+                alert('Network error. Please try again.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Navigation functions
+        function nextQuestion() {
+            if (currentQuestionIndex < questions.length - 1) {
+                currentQuestionIndex++;
+                renderQuestion();
+                updateProgress();
+            }
+        }
+
+        function previousQuestion() {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                renderQuestion();
+                updateProgress();
+            }
+        }
+
+        // Update progress
+        function updateProgress() {
+            const answered = Object.keys(answers).length;
+            const total = questions.length;
+            const percentage = (answered / total) * 100;
+            
+            document.getElementById('progressText').textContent = `${answered}/${total} questions`;
+            document.getElementById('progressBar').style.width = `${percentage}%`;
+        }
+
+        // Show sections
+        function showQuestionsSection() {
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('questionsSection').classList.remove('hidden');
+            document.getElementById('completionSection').classList.add('hidden');
+            
+            // Update patient info
+            document.getElementById('patientName').textContent = currentPatient.patient_initials;
+            document.getElementById('patientPHN').textContent = currentPatient.contact_no;
+        }
+
+        function showCompletionSection(riskAssessment = null) {
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('questionsSection').classList.add('hidden');
+            document.getElementById('completionSection').classList.remove('hidden');
+            
+            // Update summary
+            document.getElementById('totalQuestions').textContent = questions.length;
+            document.getElementById('answeredQuestions').textContent = Object.keys(answers).length;
+            
+            // Show risk assessment if available
+            if (riskAssessment) {
+                const riskHtml = riskAssessment.level === 'HIGH_RISK' ? `
+                    <div class="risk-high text-white rounded-lg p-6">
+                        <div class="flex items-center justify-center mb-4">
+                            <i class="fas fa-exclamation-triangle text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">HIGH RISK</h3>
+                        <p class="text-sm opacity-90">Please seek immediate medical attention</p>
+                        <div class="mt-4 text-xs opacity-75">
+                            Risk Score: ${riskAssessment.score || 'N/A'}<br>
+                            ${riskAssessment.reasons ? riskAssessment.reasons.join(', ') : ''}
+                        </div>
+                    </div>
+                ` : riskAssessment.level === 'MEDIUM_RISK' ? `
+                    <div class="bg-yellow-500 text-white rounded-lg p-6">
+                        <div class="flex items-center justify-center mb-4">
+                            <i class="fas fa-exclamation-triangle text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">MEDIUM RISK</h3>
+                        <p class="text-sm opacity-90">Please consult your healthcare provider</p>
+                        <div class="mt-4 text-xs opacity-75">
+                            Risk Score: ${riskAssessment.score || 'N/A'}<br>
+                            ${riskAssessment.reasons ? riskAssessment.reasons.join(', ') : ''}
+                        </div>
+                    </div>
+                ` : `
+                    <div class="risk-low text-white rounded-lg p-6">
+                        <div class="flex items-center justify-center mb-4">
+                            <i class="fas fa-shield-alt text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">LOW RISK</h3>
+                        <p class="text-sm opacity-90">Continue monitoring your condition</p>
+                        <div class="mt-4 text-xs opacity-75">
+                            Risk Score: ${riskAssessment.score || 'N/A'}<br>
+                            ${riskAssessment.reasons ? riskAssessment.reasons.join(', ') : ''}
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('riskAssessment').innerHTML = riskHtml;
+            }
+        }
+
+        // Utility functions
+        function showLoginError(message) {
+            const errorDiv = document.getElementById('loginError');
+            const errorMessage = document.getElementById('loginErrorMessage');
+            
+            errorMessage.textContent = message;
+            errorDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                errorDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        function showLoading(show) {
+            const overlay = document.getElementById('loadingOverlay');
+            if (show) {
+                overlay.classList.remove('hidden');
+            } else {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        function logout() {
+            currentPatient = null;
+            questions = [];
+            currentQuestionIndex = 0;
+            answers = {};
+            
+            document.getElementById('loginSection').classList.remove('hidden');
+            document.getElementById('questionsSection').classList.add('hidden');
+            document.getElementById('completionSection').classList.add('hidden');
+            document.getElementById('phn').value = '';
+        }
+
+        function viewSummary() {
+            // This would navigate to a detailed summary page
+            alert('Detailed summary page would be implemented here');
+        }
+    </script>
+</body>
+</html>
