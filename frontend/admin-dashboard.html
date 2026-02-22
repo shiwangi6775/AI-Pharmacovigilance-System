@@ -259,7 +259,7 @@
         let filteredPatients = [];
 
         // API Base URL
-        const API_BASE = 'http://localhost:8000/api/patient-interface';
+        const API_BASE = 'http://localhost:8080/api/patient-interface';
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -280,13 +280,17 @@
                 const data = await response.json();
                 console.log('Received data:', data); // Debug log
                 
-                
+                if (data.success) {
                     patients = data.patients;
                     filteredPatients = [...patients];
                     console.log('Patients loaded:', patients.length); // Debug log
                     updateStatistics();
                     renderPatientsTable();
                     updateLastUpdated();
+                } else {
+                    console.error('API returned error:', data);
+                    showError('Failed to load patient data');
+                }
                  
             } catch (error) {
                 console.error('Error loading patients:', error); // Debug log
@@ -343,7 +347,7 @@
                             <span class="text-sm text-gray-600">${patient.completion_percentage.toFixed(1)}%</span>
                         </div>
                         <div class="text-xs text-gray-500 mt-1">
-                            ${patient.answered_correctly}/${patient.total_questions} answered
+                            ${patient.answered_submitted}/${patient.total_questions} submitted
                         </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">

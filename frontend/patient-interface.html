@@ -237,7 +237,7 @@
         let answers = {};
 
         // API Base URL
-        const API_BASE = 'http://localhost:8000/api/patient-interface';
+        const API_BASE = 'http://localhost:8080/api/patient-interface';
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -404,7 +404,7 @@
                 
                 if (data.success) {
                     // Update patient progress
-                    currentPatient.answered_correctly = data.result.answered_correctly;
+                    currentPatient.answered_submitted = data.result.answered_submitted;
                     currentPatient.pending = data.result.pending;
                     currentPatient.completion_percentage = data.result.completion_percentage;
                     
@@ -447,11 +447,11 @@
 
         // Update progress
         function updateProgress() {
-            const answered = Object.keys(answers).length;
-            const total = questions.length;
-            const percentage = (answered / total) * 100;
+            const submitted = currentPatient.answered_submitted || 0;
+            const total = currentPatient.total_questions || questions.length;
+            const percentage = currentPatient.completion_percentage || 0;
             
-            document.getElementById('progressText').textContent = `${answered}/${total} questions`;
+            document.getElementById('progressText').textContent = `${submitted}/${total} submitted`;
             document.getElementById('progressBar').style.width = `${percentage}%`;
         }
 

@@ -26,7 +26,7 @@ class PatientInterface:
         cursor.execute('''
             SELECT DISTINCT pc.case_id, pc.patient_initials, pc.contact_no,
                    COUNT(pr.id) as total_questions,
-                   SUM(CASE WHEN pr.is_correct = 1 THEN 1 ELSE 0 END) as answered_correctly,
+                   SUM(CASE WHEN pr.is_correct = 1 THEN 1 ELSE 0 END) as answered_submitted,
                    SUM(CASE WHEN pr.is_correct = 0 OR pr.is_correct IS NULL THEN 1 ELSE 0 END) as pending
             FROM patient_comparisons pc
             LEFT JOIN patient_responses pr ON pc.case_id = pr.case_id
@@ -43,7 +43,7 @@ class PatientInterface:
                 'patient_initials': result[1],
                 'contact_no': result[2],
                 'total_questions': result[3] or 0,
-                'answered_correctly': result[4] or 0,
+                'answered_submitted': result[4] or 0,
                 'pending': result[5] or 0,
                 'completion_percentage': ((result[4] or 0) / (result[3] or 1)) * 100
             }
@@ -94,20 +94,21 @@ class PatientInterface:
         
         expected_answer = str(result[0])
         case_id = result[1]
-        is_correct = str(answer).strip().lower() == expected_answer.strip().lower()
+        # Mark as submitted (1) instead of checking correctness
+        is_submitted = 1
         
         # Update response
         cursor.execute('''
             UPDATE patient_responses 
             SET patient_answer = ?, is_correct = ?, responded_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        ''', (answer, is_correct, response_id))
+        ''', (answer, is_submitted, response_id))
         
         # Get updated progress
         cursor.execute('''
             SELECT 
                 COUNT(*) as total_questions,
-                SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as answered_correctly,
+                SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as answered_submitted,
                 SUM(CASE WHEN is_correct = 0 OR is_correct IS NULL THEN 1 ELSE 0 END) as pending
             FROM patient_responses
             WHERE case_id = ?
@@ -124,9 +125,9 @@ class PatientInterface:
         conn.close()
         
         return {
-            'is_correct': is_correct,
+            'is_submitted': True,
             'total_questions': progress[0] if progress else 0,
-            'answered_correctly': progress[1] if progress else 0,
+            'answered_submitted': progress[1] if progress else 0,
             'pending': progress[2] if progress else 0,
             'completion_percentage': ((progress[1] or 0) / (progress[0] or 1)) * 100,
             'risk_assessment': risk_assessment
@@ -243,7 +244,7 @@ class PatientInterface:
             SELECT 
                 pc.case_id, pc.patient_initials, pc.contact_no,
                 COUNT(pr.id) as total_questions,
-                SUM(CASE WHEN pr.is_correct = 1 THEN 1 ELSE 0 END) as answered_correctly,
+                SUM(CASE WHEN pr.is_correct = 1 THEN 1 ELSE 0 END) as answered_submitted,
                 SUM(CASE WHEN pr.is_correct = 0 OR pr.is_correct IS NULL THEN 1 ELSE 0 END) as pending,
                 ps.risk_assessment, ps.assessment_date
             FROM patient_comparisons pc
@@ -262,7 +263,7 @@ class PatientInterface:
                 'patient_initials': result[1],
                 'contact_no': result[2],
                 'total_questions': result[3] or 0,
-                'answered_correctly': result[4] or 0,
+                'answered_submitted': result[4] or 0,
                 'pending': result[5] or 0,
                 'completion_percentage': ((result[4] or 0) / (result[3] or 1)) * 100,
                 'risk_assessment': result[6] or "NOT_ASSESSED",
@@ -371,7 +372,7 @@ async def get_all_patients():
         SELECT 
             pc.contact_no, pc.patient_initials, pc.case_id,
             COUNT(pr.id) as total_questions,
-            SUM(CASE WHEN pr.is_correct = 1 THEN 1 ELSE 0 END) as answered_correctly,
+            SUM(CASE WHEN pr.is_correct = 1 THEN 1 ELSE 0 END) as answered_submitted,
             SUM(CASE WHEN pr.is_correct = 0 OR pr.is_correct IS NULL THEN 1 ELSE 0 END) as pending,
             ps.risk_assessment
         FROM patient_comparisons pc
@@ -389,7 +390,7 @@ async def get_all_patients():
             'patient_initials': row[1],
             'case_id': row[2],
             'total_questions': row[3] or 0,
-            'answered_correctly': row[4] or 0,
+            'answered_submitted': row[4] or 0,
             'pending': row[5] or 0,
             'completion_percentage': completion_pct,
             'risk_assessment': row[6] or "NOT_ASSESSED"
