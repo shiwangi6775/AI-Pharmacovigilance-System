@@ -4,11 +4,16 @@ from typing import Dict, List, Tuple
 import json
 import sys
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 
 # Add the parent directory to the path to import the database module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import SessionLocal
 from models.patient_comparison_model import PatientComparison, PatientResponse
+from ai_engine.azure_question_generator import generate_azure_missing_field_questions
+
+load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
 
 class PatientDataComparator:
     def __init__(self, main_csv_path: str, missing_csv_path: str, db_path: str):
@@ -60,15 +65,30 @@ class PatientDataComparator:
                         'correct_value': main_value,
                         'field_name': column
                     }
-                    
-                    # Generate specific questions based on field type
-                    question = self._generate_question(column, main_row['Patient Initials'], contact_no)
-                    if question:
-                        questions.append({
-                            'field': column,
-                            'question': question,
-                            'expected_answer': main_value
-                        })
+
+            missing_field_names = list(missing_fields.keys())
+
+            try:
+                azure_questions = generate_azure_missing_field_questions(
+                    patient_initials=main_row['Patient Initials'],
+                    contact_no=str(contact_no),
+                    missing_fields=missing_field_names,
+                    language="en",
+                )
+            except Exception:
+                azure_questions = {}
+
+            for column in missing_field_names:
+                main_value = main_row[column]
+                question = azure_questions.get(column)
+                if not question:
+                    question = f"Please provide the {column} for patient {main_row['Patient Initials']} (PHN: {contact_no})"
+
+                questions.append({
+                    'field': column,
+                    'question': question,
+                    'expected_answer': main_value
+                })
             
             comparison_results.append({
                 'case_id': case_id,

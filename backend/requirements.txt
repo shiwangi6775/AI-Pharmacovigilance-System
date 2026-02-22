@@ -9,3 +9,5 @@ python-multipart==0.0.12
 sentence-transformers==3.0.1
 twilio==9.3.2
 deep_translator==1.11.1
+requests==2.32.3
+python-dotenv==1.0.1

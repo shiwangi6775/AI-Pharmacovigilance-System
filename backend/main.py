@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from pathlib import Path
+from dotenv import load_dotenv
 from database import Base, engine, SessionLocal
 from models.case_model import Case
 # from ai_engine.question_generator import generate_followup_questions
@@ -10,6 +12,7 @@ from models.case_model import Case
 # from ai_engine.nlp_transformer import extract_medical_features
 # from ai_engine.risk_predictor import predict_risk_probability
 # from ai_engine.llm_question_generator import generate_llm_followup_questions
+from ai_engine.azure_question_generator import generate_azure_followup_questions
 from database import Base, engine
 # from models.user_model import User
 from routes.excel_routes import router as excel_router
@@ -19,6 +22,8 @@ from routes.patient_interface_routes import router as patient_interface_router
 
 
 
+
+load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
 
 Base.metadata.create_all(bind=engine)
 
@@ -74,11 +79,15 @@ def submit_case(case: CaseInput):
     # case.language 
     # )
 
-    questions = [
-        "Did the reaction worsen?",
-        "Did you consult a doctor?",
-        "Did symptoms improve after stopping the drug?"
-    ]
+    try:
+        questions = generate_azure_followup_questions(
+            case.drug_name,
+            case.reaction,
+            language=case.language,
+            n_questions=3,
+        )
+    except Exception:
+        questions = generate_questions()
 
     new_case = Case(
         drug_name=case.drug_name,
