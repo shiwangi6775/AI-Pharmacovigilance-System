@@ -12,7 +12,10 @@ from models.case_model import Case
 # from ai_engine.nlp_transformer import extract_medical_features
 # from ai_engine.risk_predictor import predict_risk_probability
 # from ai_engine.llm_question_generator import generate_llm_followup_questions
-from ai_engine.azure_question_generator import generate_azure_followup_questions
+from ai_engine.azure_question_generator import (
+    generate_azure_followup_questions,
+    generate_azure_followup_questions_bilingual,
+)
 from database import Base, engine
 # from models.user_model import User
 from routes.excel_routes import router as excel_router
@@ -79,15 +82,25 @@ def submit_case(case: CaseInput):
     # case.language 
     # )
 
+    follow_up_questions_hi = []
     try:
-        questions = generate_azure_followup_questions(
+        bilingual = generate_azure_followup_questions_bilingual(
             case.drug_name,
             case.reaction,
-            language=case.language,
             n_questions=3,
         )
+        questions = bilingual.get("en") or []
+        follow_up_questions_hi = bilingual.get("hi") or []
     except Exception:
-        questions = generate_questions()
+        try:
+            questions = generate_azure_followup_questions(
+                case.drug_name,
+                case.reaction,
+                language=case.language,
+                n_questions=3,
+            )
+        except Exception:
+            questions = generate_questions()
 
     new_case = Case(
         drug_name=case.drug_name,
@@ -114,7 +127,8 @@ def submit_case(case: CaseInput):
     return {
         "case_id": new_case.id,
         "risk_level": risk,
-        "follow_up_questions": questions
+        "follow_up_questions": questions,
+        "follow_up_questions_hi": follow_up_questions_hi,
     }
 
 

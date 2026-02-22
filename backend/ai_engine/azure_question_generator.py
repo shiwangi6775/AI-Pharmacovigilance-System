@@ -103,6 +103,78 @@ def generate_azure_followup_questions(
     return questions[:n_questions]
 
 
+def generate_azure_followup_questions_bilingual(
+    drug_name: str,
+    reaction: str,
+    *,
+    n_questions: int = 3,
+    timeout_seconds: int = 30,
+) -> Dict[str, List[str]]:
+    if not _is_configured():
+        raise RuntimeError("Azure OpenAI env vars are not fully configured")
+
+    endpoint = _env("AZURE_ENDPOINT")
+    api_key = _env("AZURE_OPENAI_API_KEY")
+    api_version = _env("AZURE_API_VERSION")
+    deployment = _env("AZURE_DEPLOYMENT")
+
+    endpoint = endpoint.rstrip("/")
+    url = f"{endpoint}/openai/deployments/{deployment}/chat/completions"
+
+    system = (
+        "You are a pharmacovigilance assistant. "
+        "Generate concise, clinically relevant follow-up questions to assess an adverse drug reaction."
+    )
+
+    user = (
+        f"Drug: {drug_name}\n"
+        f"Reaction: {reaction}\n\n"
+        f"Generate exactly {n_questions} follow-up questions in English and Hindi. "
+        "Return ONLY JSON in the following format: "
+        "{\"en\": [..], \"hi\": [..]}."
+    )
+
+    payload = {
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "temperature": 0.7,
+        "max_tokens": 400,
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "api-key": api_key,
+    }
+
+    resp = requests.post(
+        url,
+        params={"api-version": api_version},
+        headers=headers,
+        json=payload,
+        timeout=timeout_seconds,
+    )
+    resp.raise_for_status()
+
+    data = resp.json()
+    content = data["choices"][0]["message"]["content"].strip()
+    obj = json.loads(content)
+    if not isinstance(obj, dict):
+        raise ValueError("Azure model did not return a JSON object")
+
+    en = obj.get("en")
+    hi = obj.get("hi")
+    if not isinstance(en, list) or not all(isinstance(q, str) for q in en):
+        raise ValueError("Azure model did not return valid en questions")
+    if not isinstance(hi, list) or not all(isinstance(q, str) for q in hi):
+        raise ValueError("Azure model did not return valid hi questions")
+
+    en_clean = [q.strip() for q in en if q.strip()][:n_questions]
+    hi_clean = [q.strip() for q in hi if q.strip()][:n_questions]
+    return {"en": en_clean, "hi": hi_clean}
+
+
 def generate_azure_missing_field_questions(
     *,
     patient_initials: str,
@@ -185,3 +257,88 @@ def generate_azure_missing_field_questions(
             cleaned[field] = q.strip()
 
     return cleaned
+
+
+def generate_azure_missing_field_questions_bilingual(
+    *,
+    patient_initials: str,
+    contact_no: str,
+    missing_fields: List[str],
+    timeout_seconds: int = 30,
+) -> Dict[str, Dict[str, str]]:
+    if not _is_configured():
+        raise RuntimeError("Azure OpenAI env vars are not fully configured")
+
+    if not missing_fields:
+        return {"en": {}, "hi": {}}
+
+    endpoint = _env("AZURE_ENDPOINT")
+    api_key = _env("AZURE_OPENAI_API_KEY")
+    api_version = _env("AZURE_API_VERSION")
+    deployment = _env("AZURE_DEPLOYMENT")
+
+    endpoint = endpoint.rstrip("/")
+    url = f"{endpoint}/openai/deployments/{deployment}/chat/completions"
+
+    system = (
+        "You are a pharmacovigilance data-collection assistant. "
+        "Ask exactly one question per missing field. "
+        "Be clear and concise."
+    )
+
+    patient_identifier = f"patient {patient_initials} (PHN: {contact_no})"
+    fields_json = json.dumps(missing_fields, ensure_ascii=False)
+
+    user = (
+        f"Patient: {patient_identifier}\n"
+        f"Missing fields (CSV column names): {fields_json}\n\n"
+        "Return ONLY JSON in the following format: "
+        "{\"en\": {field: question}, \"hi\": {field: question}}. "
+        "Keys must be the exact field names."
+    )
+
+    payload = {
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "temperature": 0.7,
+        "max_tokens": 900,
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "api-key": api_key,
+    }
+
+    resp = requests.post(
+        url,
+        params={"api-version": api_version},
+        headers=headers,
+        json=payload,
+        timeout=timeout_seconds,
+    )
+    resp.raise_for_status()
+
+    data = resp.json()
+    content = data["choices"][0]["message"]["content"].strip()
+    obj = json.loads(content)
+    if not isinstance(obj, dict):
+        raise ValueError("Azure model did not return a JSON object")
+
+    en_map = obj.get("en")
+    hi_map = obj.get("hi")
+    if not isinstance(en_map, dict) or not isinstance(hi_map, dict):
+        raise ValueError("Azure model did not return both en and hi maps")
+
+    en_clean: Dict[str, str] = {}
+    hi_clean: Dict[str, str] = {}
+    for field in missing_fields:
+        q_en = en_map.get(field)
+        q_hi = hi_map.get(field)
+        if isinstance(q_en, str) and q_en.strip():
+            en_clean[field] = q_en.strip()
+        if isinstance(q_hi, str) and q_hi.strip():
+            hi_clean[field] = q_hi.strip()
+
+    return {"en": en_clean, "hi": hi_clean}

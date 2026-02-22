@@ -235,6 +235,7 @@
         let questions = [];
         let currentQuestionIndex = 0;
         let answers = {};
+        let selectedLanguage = localStorage.getItem('pv_language') || 'en';
 
         // API Base URL
         const API_BASE = 'http://localhost:8080/api/patient-interface';
@@ -243,6 +244,26 @@
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('loginForm').addEventListener('submit', handleLogin);
         });
+
+        function getQuestionText(questionObj) {
+            if (selectedLanguage === 'hi') {
+                const hi = (questionObj.question_hi || '').trim();
+                if (hi) return hi;
+            }
+            return (questionObj.question || '').trim();
+        }
+
+        function setLanguage(lang) {
+            selectedLanguage = lang;
+            localStorage.setItem('pv_language', lang);
+
+            const languageSelect = document.getElementById('languageSelect');
+            if (languageSelect) {
+                languageSelect.value = lang;
+            }
+
+            renderQuestion();
+        }
 
         // Handle login
         async function handleLogin(e) {
@@ -310,6 +331,7 @@
 
             const question = questions[currentQuestionIndex];
             const container = document.getElementById('questionsContainer');
+            const questionText = getQuestionText(question);
             
             container.innerHTML = `
                 <div class="question-card bg-white rounded-xl shadow-lg p-6">
@@ -318,7 +340,7 @@
                             <span class="text-blue-600 font-semibold text-sm">${currentQuestionIndex + 1}</span>
                         </div>
                         <div class="flex-1">
-                            <h3 class="text-lg font-semibold text-gray-900 mb-2">${question.question}</h3>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">${questionText}</h3>
                             <p class="text-sm text-gray-500 mb-4">Field: ${question.field_name}</p>
                         </div>
                     </div>
@@ -464,6 +486,31 @@
             // Update patient info
             document.getElementById('patientName').textContent = currentPatient.patient_initials;
             document.getElementById('patientPHN').textContent = currentPatient.contact_no;
+
+            // Inject language selector once
+            const patientNameEl = document.getElementById('patientName');
+            const existing = document.getElementById('languageSelect');
+            if (!existing && patientNameEl) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'mt-2';
+                wrapper.innerHTML = `
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Language</label>
+                    <select id="languageSelect" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="en">English</option>
+                        <option value="hi">Hindi</option>
+                    </select>
+                `;
+
+                const parent = patientNameEl.parentElement;
+                if (parent) {
+                    parent.appendChild(wrapper);
+                    const select = document.getElementById('languageSelect');
+                    select.value = selectedLanguage;
+                    select.addEventListener('change', (e) => setLanguage(e.target.value));
+                }
+            } else if (existing) {
+                existing.value = selectedLanguage;
+            }
         }
 
         function showCompletionSection(riskAssessment = null) {

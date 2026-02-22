@@ -258,6 +258,31 @@
         let patients = [];
         let filteredPatients = [];
 
+        function showPatientModal(summary) {
+            const modal = document.getElementById('patientModal');
+            const content = document.getElementById('patientModalContent');
+            if (!modal || !content) {
+                return;
+            }
+
+            const safe = (v) => (v === null || v === undefined ? '' : String(v));
+
+            content.innerHTML = `
+                <div class="text-left space-y-2">
+                    <div><span class="font-semibold text-gray-700">Patient Initials:</span> ${safe(summary.patient_initials)}</div>
+                    <div><span class="font-semibold text-gray-700">PHN:</span> ${safe(summary.contact_no)}</div>
+                    <div><span class="font-semibold text-gray-700">Case ID:</span> ${safe(summary.case_id)}</div>
+                    <div><span class="font-semibold text-gray-700">Total Questions:</span> ${safe(summary.total_questions)}</div>
+                    <div><span class="font-semibold text-gray-700">Answered/Submitted:</span> ${safe(summary.answered_submitted)}</div>
+                    <div><span class="font-semibold text-gray-700">Pending:</span> ${safe(summary.pending)}</div>
+                    <div><span class="font-semibold text-gray-700">Completion %:</span> ${safe(summary.completion_percentage)}</div>
+                    <div><span class="font-semibold text-gray-700">Risk Assessment:</span> ${safe(summary.risk_assessment)}</div>
+                </div>
+            `;
+
+            modal.classList.remove('hidden');
+        }
+
         // API Base URL
         const API_BASE = 'http://localhost:8080/api/patient-interface';
 
@@ -266,6 +291,11 @@
             loadPatients();
             // Auto-refresh every 10 seconds (more frequent)
             setInterval(loadPatients, 10000);
+
+            const closeBtn = document.getElementById('closeSummaryModal');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', closePatientModal);
+            }
         });
 
         // Load patients data

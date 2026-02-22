@@ -11,7 +11,10 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import SessionLocal
 from models.patient_comparison_model import PatientComparison, PatientResponse
-from ai_engine.azure_question_generator import generate_azure_missing_field_questions
+from ai_engine.azure_question_generator import (
+    generate_azure_missing_field_questions,
+    generate_azure_missing_field_questions_bilingual,
+)
 
 load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
 
@@ -33,8 +36,27 @@ class PatientDataComparator:
     def compare_data(self) -> List[Dict]:
         """Compare main data with missing data and identify missing fields"""
         comparison_results = []
+
+        max_patients_env = os.getenv("MAX_PATIENTS")
+        max_patients = int(max_patients_env) if max_patients_env and max_patients_env.isdigit() else None
+        disable_azure = (os.getenv("DISABLE_AZURE") or "").strip() in {"1", "true", "TRUE", "yes", "YES"}
+        azure_timeout_env = os.getenv("AZURE_TIMEOUT_SECONDS")
+        azure_timeout_seconds = (
+            int(azure_timeout_env)
+            if azure_timeout_env and azure_timeout_env.isdigit()
+            else 30
+        )
         
-        for _, missing_row in self.missing_df.iterrows():
+        for i, (_, missing_row) in enumerate(self.missing_df.iterrows(), start=1):
+            if max_patients is not None and i > max_patients:
+                break
+
+            if i == 1 or i % 10 == 0:
+                total = len(self.missing_df)
+                if max_patients is not None:
+                    total = min(total, max_patients)
+                print(f"Processing patient {i}/{total}...")
+
             case_id = missing_row['Case ID']
             contact_no = missing_row['Contact no']
             
@@ -69,24 +91,36 @@ class PatientDataComparator:
             missing_field_names = list(missing_fields.keys())
 
             try:
-                azure_questions = generate_azure_missing_field_questions(
-                    patient_initials=main_row['Patient Initials'],
-                    contact_no=str(contact_no),
-                    missing_fields=missing_field_names,
-                    language="en",
-                )
+                if disable_azure:
+                    azure_questions = {}
+                    azure_questions_hi = {}
+                else:
+                    print(f"Generating bilingual questions via Azure for Case ID {case_id} ({len(missing_field_names)} fields)...")
+                    bilingual = generate_azure_missing_field_questions_bilingual(
+                        patient_initials=main_row['Patient Initials'],
+                        contact_no=str(contact_no),
+                        missing_fields=missing_field_names,
+                        timeout_seconds=azure_timeout_seconds,
+                    )
+                    azure_questions = bilingual.get("en") or {}
+                    azure_questions_hi = bilingual.get("hi") or {}
             except Exception:
                 azure_questions = {}
+                azure_questions_hi = {}
 
             for column in missing_field_names:
                 main_value = main_row[column]
                 question = azure_questions.get(column)
+                question_hi = azure_questions_hi.get(column)
                 if not question:
                     question = f"Please provide the {column} for patient {main_row['Patient Initials']} (PHN: {contact_no})"
+                if not question_hi:
+                    question_hi = ""
 
                 questions.append({
                     'field': column,
                     'question': question,
+                    'question_hi': question_hi,
                     'expected_answer': main_value
                 })
             
@@ -209,11 +243,31 @@ class PatientDataComparator:
         return comparison_results
 
 if __name__ == "__main__":
-    # Initialize the comparator
+    repo_root = Path(__file__).resolve().parent.parent
+
+    default_main_csv = repo_root / "syoms1.csv"
+    default_missing_csv = repo_root / "missed_converted.csv"
+    default_db = repo_root / "pv.db"
+
+    backend_main_csv = repo_root / "backend" / "syoms1.csv"
+    backend_missing_csv = repo_root / "backend" / "missed_converted.csv"
+    backend_db = repo_root / "backend" / "pv.db"
+
+    if not default_main_csv.exists() and backend_main_csv.exists():
+        default_main_csv = backend_main_csv
+    if not default_missing_csv.exists() and backend_missing_csv.exists():
+        default_missing_csv = backend_missing_csv
+    if not default_db.exists() and backend_db.exists():
+        default_db = backend_db
+
+    main_csv_path = os.getenv("MAIN_CSV_PATH") or str(default_main_csv)
+    missing_csv_path = os.getenv("MISSING_CSV_PATH") or str(default_missing_csv)
+    db_path = os.getenv("DB_PATH") or str(default_db)
+
     comparator = PatientDataComparator(
-        main_csv_path="syoms1.csv",
-        missing_csv_path="missed_converted.csv",
-        db_path="pv.db"
+        main_csv_path=main_csv_path,
+        missing_csv_path=missing_csv_path,
+        db_path=db_path,
     )
     
     # Run the comparison

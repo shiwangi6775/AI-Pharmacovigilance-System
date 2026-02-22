@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 import sqlite3
 import json
 from datetime import datetime
+from deep_translator import GoogleTranslator
 
 router = APIRouter(prefix="/api/patient-interface", tags=["patient-interface"])
 
@@ -53,6 +54,27 @@ class PatientInterface:
         """Get pending questions for a patient by PHN"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT questions
+            FROM patient_comparisons
+            WHERE contact_no = ?
+            LIMIT 1
+        ''', (phn,))
+        comparison_row = cursor.fetchone()
+        question_hi_by_field: Dict[str, str] = {}
+        if comparison_row and comparison_row[0]:
+            try:
+                all_q = json.loads(comparison_row[0])
+                if isinstance(all_q, list):
+                    for q in all_q:
+                        if isinstance(q, dict):
+                            field = q.get('field')
+                            q_hi = q.get('question_hi')
+                            if isinstance(field, str) and isinstance(q_hi, str) and q_hi.strip():
+                                question_hi_by_field[field] = q_hi.strip()
+            except Exception:
+                question_hi_by_field = {}
         
         cursor.execute('''
             SELECT pr.id, pr.case_id, pr.field_name, pr.question, 
@@ -64,12 +86,23 @@ class PatientInterface:
         ''', (phn,))
         
         questions = []
+        translator = None
         for row in cursor.fetchall():
+            q_hi = question_hi_by_field.get(row[2], "")
+            if not q_hi:
+                try:
+                    if translator is None:
+                        translator = GoogleTranslator(source="en", target="hi")
+                    q_hi = translator.translate(row[3])
+                except Exception:
+                    q_hi = ""
+
             questions.append({
                 'response_id': row[0],
                 'case_id': row[1],
                 'field_name': row[2],
                 'question': row[3],
+                'question_hi': q_hi,
                 'expected_answer': row[4],
                 'patient_initials': row[5]
             })
